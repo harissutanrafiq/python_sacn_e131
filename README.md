@@ -159,6 +159,190 @@ receiver.leave_multicast(1)
 receiver.stop()
 ```
 
+# Example stream movie file using opencv and this lib
+```python
+
+import cv2
+import threading
+import queue
+import time
+import sacn
+import numpy as np
+from itertools import islice
+
+# Define grid dimensions
+GRID_WIDTH = 65
+GRID_HEIGHT = 64
+
+listItem=[]
+for x in range(GRID_WIDTH):
+ for y in range(GRID_HEIGHT):
+   listT=[] 
+   listT.append(x)
+   listT.append(y)
+   listItem.append(listT)
+
+# Calculate number of pixels and universes needed
+num_pixels = GRID_WIDTH * GRID_HEIGHT
+num_channels_per_universe = 510  # Max channels per universe for DMX data
+
+# Initialize SACN sender
+sender = sacn.sACNsender(source_name="Python Sender", universeDiscovery=False)
+sender.start()  # start the sending thread
+sender.manual_flush = False
+
+sender2 = sacn.sACNsender(source_name="Python Sender", universeDiscovery=False)
+sender2.start()  # start the sending thread
+sender2.manual_flush = False
+
+# Calculate number of universes needed
+num_universes = (num_pixels * 3 + num_channels_per_universe - 1) // num_channels_per_universe
+print("Universe :")
+print(num_universes)
+
+
+# Initialize variables for FPS calculation
+fps = 0
+start_time = time.time()
+frame_count = 0
+
+video_file = 'dragonball.mp4'
+cap = cv2.VideoCapture(video_file)
+
+if not cap.isOpened():
+    print("Error: Could not open Video.")
+    exit()
+
+# Function to add FPS text overlay on a Video
+def add_fps_text(frame, fps):
+    cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+
+def split_frame_ori(fps,frame_count):
+    # Capture frame from Video
+    ret, frame = cap.read()
+    if not ret:
+        return None, None
+
+
+    rows, cols, _ = frame.shape
+    split_images = [
+        frame[:, :cols//2],     # Left half
+        frame[:, cols//2:],     # Right half
+    ]
+
+    # Add FPS text overlay
+    add_fps_text(frame, fps)
+    
+    cv2.imshow('Video Original', frame)    
+    return split_images
+
+
+def split_frame():
+    # Capture frame from camera
+    ret, frame = cap.read()
+    if not ret:
+        return None, None
+
+    resized_frame = cv2.resize(frame, (128, 64))
+    
+    rows, cols, _ = resized_frame.shape
+    split_images = [
+        resized_frame[:, :cols//2],     # Left half
+        resized_frame[:, cols//2:],     # Right half
+    ]
+
+    return split_images
+
+
+def send_frame_1(frame,sender,result_queue,listItem):
+    
+    dmx_data = frame.reshape(-1) #numpy array
+    
+   
+    for i in range(num_universes):
+      
+        start_channel = i * 510
+        end_channel = start_channel + 510
+        
+        #print(list(dmx_data[start_channel:end_channel]))
+        sender.activate_output(i+1) 
+        sender[i+1].multicast = False
+        sender[i+1].dmx_data = bytes(dmx_data[start_channel:end_channel])
+        sender[i+1].destination = "192.168.0.100"    
+        sender[i+1].destinationPort = 5568       
+       
+        
+    result_queue.put(True)
+
+def send_frame_2(frame,sender,result_queue,listItem):
+    
+    dmx_data = frame.reshape(-1) #numpy array
+    
+   
+    for i in range(num_universes):
+      
+        start_channel = i * 510
+        end_channel = start_channel + 510
+     
+        sender.activate_output(i+1) 
+        sender[i+1].multicast = False
+        sender[i+1].dmx_data = bytes(dmx_data[start_channel:end_channel])
+        sender[i+1].destination = "192.168.0.100"    
+        sender[i+1].destinationPort = 5568       
+                
+    result_queue.put(True)
+
+
+# Create queues to track completion of threads
+result_queue_1 = queue.Queue()
+result_queue_2 = queue.Queue()
+
+while cap.isOpened():
+
+    split_images_ori = split_frame_ori(fps,frame_count)
+     # Calculate FPS
+    frame_count += 1
+    if frame_count > 30:  # Calculate FPS over 30 frames
+        end_time = time.time()
+        fps = frame_count / (end_time - start_time)
+        frame_count = 0
+        start_time = end_time
+        
+    
+    
+    # Split frame into 1x2 grid
+    split_images = split_frame()
+    
+    
+    if split_images[0] is None or split_images[1] is None:
+        continue
+    
+         
+    # Split frame into 1x2 grid
+    #cv2.imshow('Video 0', split_images_ori[0])
+    #cv2.imshow('Video 1', split_images_ori[1])
+
+   
+        
+    # Create threads for each split image
+    thread_1 = threading.Thread(target=send_frame_1, args=(split_images[0], sender,result_queue_1,listItem))
+    thread_2 = threading.Thread(target=send_frame_2, args=(split_images[1],sender2,result_queue_2,listItem))
+
+    # Start threads
+    thread_1.start()
+    thread_2.start()
+
+    # Wait for threads to complete
+    thread_1.join()
+    thread_2.join()
+    
+    if cv2.waitKey(25) & 0xFF == ord('q'):
+       break
+
+
+
+```
 The usage of the receiver is simpler than the sender.
 The `sACNreceiver` can be initialized with the following parameters:
  * `bind_address: str`: Provide an IP-Address to bind to if you want to receive multicast packets from a specific interface.
