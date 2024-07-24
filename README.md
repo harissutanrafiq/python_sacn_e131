@@ -1,4 +1,4 @@
-# sACN / E1.31 module
+# sACN / E1.31 module (modified custom PORT)
 
 This module is a simple sACN library that support the standard DMX message of the protocol.
 It is based on the [2016][e1.31] version of the official ANSI E1.31 standard.
