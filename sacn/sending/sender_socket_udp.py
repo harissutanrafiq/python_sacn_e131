@@ -75,8 +75,8 @@ class SenderSocketUDP(SenderSocketBase):
         except AttributeError:
             pass
 
-    def send_unicast(self, data: RootLayer, destination: str) -> None:
-        self.send_packet(data.getBytes(), destination)
+    def send_unicast(self, data: RootLayer, destination: str,destinationPort: int) -> None:
+        self.send_packet_unicast(data.getBytes(), destination,destinationPort)
 
     def send_multicast(self, data: RootLayer, destination: str, ttl: int) -> None:
         # make socket multicast-aware: (set TTL)
@@ -92,6 +92,14 @@ class SenderSocketUDP(SenderSocketBase):
         data_raw = bytearray(data)
         try:
             self._socket.sendto(data_raw, (destination, DEFAULT_PORT))
+        except OSError as e:
+            self._logger.exception('Failed to send packet', exc_info=e)
+            raise
+    
+    def send_packet_unicast(self, data: bytearray, destination: str,destinationPort: int) -> None:
+        data_raw = bytearray(data)
+        try:
+            self._socket.sendto(data_raw, (destination, destinationPort))
         except OSError as e:
             self._logger.exception('Failed to send packet', exc_info=e)
             raise

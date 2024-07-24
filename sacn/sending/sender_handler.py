@@ -54,7 +54,8 @@ class SenderHandler(SenderSocketListener):
             self.socket.send_multicast(output._packet, udp_ip, output.ttl)
         else:
             udp_ip = output.destination
-            self.socket.send_unicast(output._packet, udp_ip)
+            udp_port = output.destinationPort
+            self.socket.send_unicast(output._packet, udp_ip,udp_port)
 
         output._last_time_send = current_time
         # increase the sequence counter

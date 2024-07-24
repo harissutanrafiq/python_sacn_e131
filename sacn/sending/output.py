@@ -9,10 +9,11 @@ class Output:
     """
 
     def __init__(self, packet: DataPacket, last_time_send: int = 0, destination: str = '127.0.0.1',
-                 multicast: bool = False, ttl: int = 8):
+                 multicast: bool = False, ttl: int = 8,destination_port: int= 5568):
         self._packet: DataPacket = packet
         self._last_time_send: int = last_time_send
         self.destination: str = destination
+        self.destination_port: int = destination_port
         self.multicast: bool = multicast
         self.ttl: int = ttl
         self._changed: bool = False
@@ -35,9 +36,11 @@ class Output:
         self._packet.priority = priority
 
     @property
-    def preview_data(self) -> bool:
-        return self._packet.option_PreviewData
+    def destinationPort(self) -> int:
+        return self._packet.destination_port
 
-    @preview_data.setter
-    def preview_data(self, preview_data: bool):
-        self._packet.option_PreviewData = preview_data
+    @destinationPort.setter
+    def destinationPort(self, destination_port: int):
+        self._packet.destination_port = destination_port
+        
+    
